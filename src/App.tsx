@@ -550,10 +550,10 @@ export default function App() {
           }
 
           // Check for hits
-          const p1Hit = updatedMeteors.some(m => 
+          const p1Hit = (prev.meteorShower.protectedPlayer !== 1) && updatedMeteors.some(m => 
             Math.sqrt((m.pos.x - prev.player1Pos.x) ** 2 + (m.pos.y - prev.player1Pos.y) ** 2) < MONKEY_SIZE
           );
-          const p2Hit = updatedMeteors.some(m => 
+          const p2Hit = (prev.meteorShower.protectedPlayer !== 2) && updatedMeteors.some(m => 
             Math.sqrt((m.pos.x - prev.player2Pos.x) ** 2 + (m.pos.y - prev.player2Pos.y) ** 2) < MONKEY_SIZE
           );
 
@@ -820,7 +820,8 @@ export default function App() {
                       centerX: newPos.x,
                       startTime: Date.now(),
                       duration: 4000, // 1s warning + 3s falling
-                      meteors: []
+                      meteors: [],
+                      protectedPlayer: prev.currentPlayer
                     },
                     banana: undefined,
                     explosion: undefined,
@@ -1490,7 +1491,7 @@ export default function App() {
     }
 
     // Draw Monkeys
-    const drawMonkey = (pos: Point, color: string, isThrowing: boolean, isPlayer1: boolean, isWinner: boolean, isDead: boolean, isActive: boolean) => {
+    const drawMonkey = (pos: Point, color: string, isThrowing: boolean, isPlayer1: boolean, isWinner: boolean, isDead: boolean, isActive: boolean, hasUmbrella: boolean = false) => {
       if (isActive && !isDead) {
         ctx.save();
         const bounce = Math.sin(Date.now() / 150) * 5;
@@ -1516,79 +1517,172 @@ export default function App() {
         ctx.translate(0, 10);
       }
 
-      // QBasic Gorilla Pixel Art Style
-      // Pixel size is roughly 2.5x2.5 to fit in the 30x30 area
+      // Refined Gorilla Drawing
       const p = 2.5; 
-      ctx.fillStyle = color; // Should be the tan/orange color
+      const furColor = color; // Main fur color
+      const faceColor = '#FFCC99'; // Lighter face/chest color
+      const shadowColor = 'rgba(0,0,0,0.2)';
+      const highlightColor = 'rgba(255,255,255,0.2)';
 
-      // Head (centered at x=0, y=-15)
-      ctx.fillRect(-2 * p, -10 * p, 4 * p, 3 * p); // Top of head
-      // Eyes/Brow line
-      ctx.fillStyle = '#000';
-      ctx.fillRect(-2 * p, -8 * p, 4 * p, 1 * p);
-      ctx.fillStyle = color;
+      // 1. Ears
+      ctx.fillStyle = furColor;
+      ctx.fillRect(-3.5 * p, -9.5 * p, 1.5 * p, 2 * p); // Left ear
+      ctx.fillRect(2 * p, -9.5 * p, 1.5 * p, 2 * p);  // Right ear
+
+      // 2. Head
+      ctx.fillStyle = furColor;
+      ctx.fillRect(-2.5 * p, -10.5 * p, 5 * p, 4.5 * p); // Main head shape
       
-      // Body
-      ctx.fillRect(-3 * p, -7 * p, 6 * p, 5 * p); // Main torso
-      // Chest line
-      ctx.fillStyle = '#000';
-      ctx.fillRect(-1 * p, -5 * p, 2 * p, 0.5 * p);
-      ctx.fillStyle = color;
+      // 3. Face Mask
+      ctx.fillStyle = faceColor;
+      ctx.fillRect(-1.5 * p, -8.5 * p, 3 * p, 2.5 * p); // Face area
       
-      // Arms
+      // 4. Eyes
+      ctx.fillStyle = '#000';
+      ctx.fillRect(-1 * p, -7.5 * p, 0.8 * p, 0.8 * p); // Left eye
+      ctx.fillRect(0.2 * p, -7.5 * p, 0.8 * p, 0.8 * p); // Right eye
+      
+      // 5. Body
+      ctx.fillStyle = furColor;
+      ctx.fillRect(-4 * p, -6 * p, 8 * p, 6 * p); // Main torso
+      
+      // 6. Chest Patch
+      ctx.fillStyle = faceColor;
+      ctx.fillRect(-2.5 * p, -5 * p, 5 * p, 4 * p); // Chest area
+      
+      // 7. Arms
+      ctx.fillStyle = furColor;
       if (isWinner) {
         const beat = Math.sin(Date.now() / 150) > 0;
         if (beat) {
           // Arms up (Victory)
-          ctx.fillRect(-5 * p, -11 * p, 2 * p, 5 * p); // Left arm up
-          ctx.fillRect(3 * p, -11 * p, 2 * p, 5 * p);  // Right arm up
+          ctx.fillRect(-6 * p, -11 * p, 2.5 * p, 6 * p); // Left arm up
+          ctx.fillRect(3.5 * p, -11 * p, 2.5 * p, 6 * p);  // Right arm up
+          // Hands
+          ctx.fillStyle = faceColor;
+          ctx.fillRect(-6 * p, -12 * p, 2.5 * p, 1.5 * p);
+          ctx.fillRect(3.5 * p, -12 * p, 2.5 * p, 1.5 * p);
         } else {
           // Arms down/bent
-          ctx.fillRect(-6 * p, -7 * p, 3 * p, 3 * p); // Left shoulder
-          ctx.fillRect(3 * p, -7 * p, 3 * p, 3 * p);  // Right shoulder
-          ctx.fillRect(-6 * p, -4 * p, 2 * p, 4 * p); // Left arm down
-          ctx.fillRect(4 * p, -4 * p, 2 * p, 4 * p);  // Right arm down
+          ctx.fillRect(-7 * p, -7 * p, 3.5 * p, 3 * p); // Left shoulder
+          ctx.fillRect(3.5 * p, -7 * p, 3.5 * p, 3 * p);  // Right shoulder
+          ctx.fillRect(-7 * p, -4 * p, 2 * p, 5 * p); // Left arm down
+          ctx.fillRect(5 * p, -4 * p, 2 * p, 5 * p);  // Right arm down
+          // Hands
+          ctx.fillStyle = faceColor;
+          ctx.fillRect(-7 * p, 1 * p, 2 * p, 1.5 * p);
+          ctx.fillRect(5 * p, 1 * p, 2 * p, 1.5 * p);
         }
       } else if (isThrowing) {
         const elapsed = Date.now() - (gameState.throwStartTime || 0);
         const armUp = elapsed < 400;
         if (isPlayer1) {
           // Player 1 throwing (Left arm up)
-          if (armUp) ctx.fillRect(-5 * p, -12 * p, 2 * p, 6 * p);
-          else ctx.fillRect(-6 * p, -7 * p, 3 * p, 4 * p);
+          if (armUp) {
+            ctx.fillRect(-6 * p, -12 * p, 2.5 * p, 7 * p);
+            ctx.fillStyle = faceColor;
+            ctx.fillRect(-6 * p, -13 * p, 2.5 * p, 1.5 * p);
+            ctx.fillStyle = furColor;
+          } else {
+            ctx.fillRect(-7 * p, -7 * p, 3.5 * p, 4 * p);
+          }
           
           // Right arm on hip
-          ctx.fillRect(3 * p, -7 * p, 3 * p, 3 * p);
-          ctx.fillRect(4 * p, -4 * p, 2 * p, 4 * p);
+          ctx.fillRect(4 * p, -7 * p, 3 * p, 3 * p);
+          ctx.fillRect(5 * p, -4 * p, 2 * p, 4 * p);
+          ctx.fillStyle = faceColor;
+          ctx.fillRect(3.5 * p, -1 * p, 2 * p, 1.5 * p);
         } else {
           // Player 2 throwing (Right arm up)
-          if (armUp) ctx.fillRect(3 * p, -12 * p, 2 * p, 6 * p);
-          else ctx.fillRect(3 * p, -7 * p, 3 * p, 4 * p);
+          if (armUp) {
+            ctx.fillRect(3.5 * p, -12 * p, 2.5 * p, 7 * p);
+            ctx.fillStyle = faceColor;
+            ctx.fillRect(3.5 * p, -13 * p, 2.5 * p, 1.5 * p);
+            ctx.fillStyle = furColor;
+          } else {
+            ctx.fillRect(3.5 * p, -7 * p, 3.5 * p, 4 * p);
+          }
           
           // Left arm on hip
-          ctx.fillRect(-6 * p, -7 * p, 3 * p, 3 * p);
-          ctx.fillRect(-6 * p, -4 * p, 2 * p, 4 * p);
+          ctx.fillRect(-7 * p, -7 * p, 3 * p, 3 * p);
+          ctx.fillRect(-7 * p, -4 * p, 2 * p, 4 * p);
+          ctx.fillStyle = faceColor;
+          ctx.fillRect(-5.5 * p, -1 * p, 2 * p, 1.5 * p);
         }
       } else {
-        // Classic "Hands on hips" pose from the image
+        // Hands on hips
         // Left arm
-        ctx.fillRect(-6 * p, -7 * p, 3 * p, 3 * p); // Shoulder
-        ctx.fillRect(-6 * p, -4 * p, 2 * p, 4 * p); // Arm down
-        ctx.fillRect(-4 * p, -1 * p, 2 * p, 2 * p); // Hand on hip
+        ctx.fillRect(-7 * p, -7 * p, 3.5 * p, 3 * p); // Shoulder
+        ctx.fillRect(-7 * p, -4 * p, 2 * p, 4 * p); // Arm down
+        ctx.fillStyle = faceColor;
+        ctx.fillRect(-5.5 * p, -1 * p, 2 * p, 1.5 * p); // Hand
         
         // Right arm
-        ctx.fillRect(3 * p, -7 * p, 3 * p, 3 * p); // Shoulder
-        ctx.fillRect(4 * p, -4 * p, 2 * p, 4 * p); // Arm down
-        ctx.fillRect(2 * p, -1 * p, 2 * p, 2 * p); // Hand on hip
+        ctx.fillStyle = furColor;
+        ctx.fillRect(3.5 * p, -7 * p, 3.5 * p, 3 * p); // Shoulder
+        ctx.fillRect(5 * p, -4 * p, 2 * p, 4 * p); // Arm down
+        ctx.fillStyle = faceColor;
+        ctx.fillRect(3.5 * p, -1 * p, 2 * p, 1.5 * p); // Hand
       }
       
-      // Legs
-      ctx.fillRect(-3 * p, -2 * p, 2 * p, 4 * p); // Left leg
-      ctx.fillRect(1 * p, -2 * p, 2 * p, 4 * p);  // Right leg
+      // 8. Legs
+      ctx.fillStyle = furColor;
+      ctx.fillRect(-3.5 * p, 0 * p, 2.5 * p, 4 * p); // Left leg
+      ctx.fillRect(1 * p, 0 * p, 2.5 * p, 4 * p);  // Right leg
       
-      // Feet
-      ctx.fillRect(-4 * p, 2 * p, 3 * p, 1.5 * p); // Left foot
-      ctx.fillRect(1 * p, 2 * p, 3 * p, 1.5 * p);  // Right foot
+      // 9. Feet
+      ctx.fillStyle = faceColor;
+      ctx.fillRect(-4.5 * p, 4 * p, 3.5 * p, 1.5 * p); // Left foot
+      ctx.fillRect(1 * p, 4 * p, 3.5 * p, 1.5 * p);  // Right foot
+
+      // 10. Shading/Highlights (Subtle)
+      ctx.fillStyle = highlightColor;
+      ctx.fillRect(-2 * p, -10 * p, 1 * p, 1 * p); // Head highlight
+      ctx.fillRect(-3.5 * p, -5.5 * p, 1 * p, 1 * p); // Shoulder highlight
+      
+      ctx.fillStyle = shadowColor;
+      ctx.fillRect(-3.5 * p, -1 * p, 2.5 * p, 0.5 * p); // Leg shadow
+      ctx.fillRect(1 * p, -1 * p, 2.5 * p, 0.5 * p);  // Leg shadow
+
+      // 11. Umbrella (if protected during meteor shower)
+      if (hasUmbrella) {
+        ctx.save();
+        ctx.translate(0, -15 * p); // Move above head
+        
+        // Handle
+        ctx.strokeStyle = '#8B4513';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(0, -25);
+        ctx.stroke();
+        
+        // Canopy
+        const umbrellaColor = '#FF4444';
+        ctx.fillStyle = umbrellaColor;
+        ctx.beginPath();
+        ctx.arc(0, -25, 40, Math.PI, 0);
+        ctx.fill();
+        
+        // Ribs/Details
+        ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+        ctx.lineWidth = 2;
+        for (let i = 1; i < 4; i++) {
+          ctx.beginPath();
+          ctx.moveTo(0, -25);
+          const angle = Math.PI + (i * Math.PI) / 4;
+          ctx.lineTo(Math.cos(angle) * 40, -25 + Math.sin(angle) * 40);
+          ctx.stroke();
+        }
+        
+        // Top point
+        ctx.fillStyle = '#FFD700';
+        ctx.beginPath();
+        ctx.arc(0, -65, 4, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.restore();
+      }
 
       ctx.restore();
     };
@@ -1602,8 +1696,11 @@ export default function App() {
     const p1Active = gameState.currentPlayer === 1 && (gameState.status === 'aiming' || gameState.status === 'throwing');
     const p2Active = gameState.currentPlayer === 2 && (gameState.status === 'aiming' || gameState.status === 'throwing');
 
-    drawMonkey(gameState.player1Pos, '#FFB84D', p1Throwing, true, p1Winner, p1Dead, p1Active);
-    drawMonkey(gameState.player2Pos, '#FFB84D', p2Throwing, false, p2Winner, p2Dead, p2Active);
+    const p1HasUmbrella = gameState.status === 'meteorShower' && gameState.meteorShower?.protectedPlayer === 1;
+    const p2HasUmbrella = gameState.status === 'meteorShower' && gameState.meteorShower?.protectedPlayer === 2;
+
+    drawMonkey(gameState.player1Pos, '#FFB84D', p1Throwing, true, p1Winner, p1Dead, p1Active, p1HasUmbrella);
+    drawMonkey(gameState.player2Pos, '#FFB84D', p2Throwing, false, p2Winner, p2Dead, p2Active, p2HasUmbrella);
 
     // Draw Banana
     if (gameState.banana) {

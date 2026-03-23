@@ -58,6 +58,7 @@ export interface MeteorShower {
   startTime: number;
   duration: number;
   meteors: Meteor[];
+  protectedPlayer?: 1 | 2;
 }
 
 export interface GameState {
