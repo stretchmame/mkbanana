@@ -970,26 +970,6 @@ export default function App() {
       ctx.translate(sx, sy);
     }
 
-    // Draw Center Split Line (Visual Hint)
-    if (gameState.status === 'aiming') {
-      // Highlight active side
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
-      if (gameState.currentPlayer === 1) {
-        ctx.fillRect(0, 0, CANVAS_WIDTH / 2, CANVAS_HEIGHT);
-      } else {
-        ctx.fillRect(CANVAS_WIDTH / 2, 0, CANVAS_WIDTH / 2, CANVAS_HEIGHT);
-      }
-
-      ctx.setLineDash([5, 5]);
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(CANVAS_WIDTH / 2, 0);
-      ctx.lineTo(CANVAS_WIDTH / 2, CANVAS_HEIGHT);
-      ctx.stroke();
-      ctx.setLineDash([]);
-    }
-
     // Draw Buildings
     gameState.buildings.forEach(b => {
       ctx.fillStyle = b.color;
