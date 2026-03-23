@@ -962,6 +962,8 @@ export default function App() {
     ctx.fillStyle = '#0000AA';
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
+    const time = Date.now() / 1000;
+
     // Apply Screen Shake
     if (gameState.shake > 0) {
       const sx = (Math.random() - 0.5) * gameState.shake;
@@ -982,7 +984,14 @@ export default function App() {
       const gapY = 15;
       b.windows.forEach((row, r) => {
         row.forEach((isOn, c) => {
-          ctx.fillStyle = isOn ? '#FFFF55' : '#000000';
+          if (isOn) {
+            // Random flicker based on position and time
+            const flicker = Math.sin(time * 2 + (b.x + c) * 0.5 + (b.y + r) * 0.3);
+            const alpha = flicker > 0.8 ? 0.3 : 1.0; // Occasional dimming
+            ctx.fillStyle = `rgba(255, 255, 85, ${alpha})`;
+          } else {
+            ctx.fillStyle = '#000000';
+          }
           ctx.fillRect(b.x + 5 + c * gapX, b.y + 10 + r * gapY, winW, winH);
         });
       });
@@ -1045,7 +1054,10 @@ export default function App() {
     ctx.save();
     const sunX = gameState.sunPos.x;
     const sunY = gameState.sunPos.y;
-    const time = Date.now() / 1000;
+
+    // Breathing effect for normal sun
+    const breathing = (gameState.sunState === 'normal' || gameState.sunState === 'surprised') ? Math.sin(time * 3) * 1.2 : 0;
+    const baseRadius = 20 + breathing;
 
     // Sun rays (animated rotation for non-skull)
     if (gameState.sunState !== 'skull') {
@@ -1054,9 +1066,11 @@ export default function App() {
       const rayRotation = time * 0.5;
       for (let i = 0; i < 12; i++) {
         const angle = (i * Math.PI) / 6 + rayRotation;
-        const rayLen = gameState.sunState === 'falling' ? 45 : 35;
+        // Rays also pulse slightly
+        const rayPulse = (gameState.sunState === 'normal' || gameState.sunState === 'surprised') ? Math.sin(time * 3 + 0.5) * 3 : 0;
+        const rayLen = gameState.sunState === 'falling' ? 45 : 35 + rayPulse;
         ctx.beginPath();
-        ctx.moveTo(sunX + Math.cos(angle) * 25, sunY + Math.sin(angle) * 25);
+        ctx.moveTo(sunX + Math.cos(angle) * (baseRadius + 5), sunY + Math.sin(angle) * (baseRadius + 5));
         ctx.lineTo(sunX + Math.cos(angle) * rayLen, sunY + Math.sin(angle) * rayLen);
         ctx.stroke();
       }
@@ -1066,6 +1080,12 @@ export default function App() {
     if (gameState.sunState === 'skull') {
       // Draw Detailed Skull
       ctx.fillStyle = '#F0F0F0';
+      // Subtle gradient for depth
+      const grad = ctx.createRadialGradient(sunX - 5, sunY - 5, 5, sunX, sunY, 25);
+      grad.addColorStop(0, '#FFFFFF');
+      grad.addColorStop(1, '#D0D0D0');
+      ctx.fillStyle = grad;
+      
       ctx.shadowBlur = 15;
       ctx.shadowColor = 'rgba(0,0,0,0.3)';
       ctx.beginPath();
@@ -1081,8 +1101,16 @@ export default function App() {
       ctx.beginPath();
       ctx.ellipse(sunX + 8, sunY - 5, 6, 8, -0.2, 0, Math.PI * 2);
       ctx.fill();
+      
+      // Faint red glow in eyes
+      ctx.fillStyle = 'rgba(255, 0, 0, 0.2)';
+      ctx.beginPath();
+      ctx.arc(sunX - 8, sunY - 3, 2, 0, Math.PI * 2);
+      ctx.arc(sunX + 8, sunY - 3, 2, 0, Math.PI * 2);
+      ctx.fill();
 
       // Nose Hole
+      ctx.fillStyle = '#1a1a1a';
       ctx.beginPath();
       ctx.moveTo(sunX, sunY + 3);
       ctx.lineTo(sunX - 3, sunY + 8);
@@ -1105,20 +1133,46 @@ export default function App() {
       }
 
       // Cracks
-      ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+      ctx.strokeStyle = 'rgba(0,0,0,0.4)';
       ctx.lineWidth = 1;
       ctx.beginPath();
+      // Top crack
       ctx.moveTo(sunX - 5, sunY - 20);
       ctx.lineTo(sunX - 2, sunY - 15);
       ctx.lineTo(sunX - 6, sunY - 12);
+      // Side crack
+      ctx.moveTo(sunX + 15, sunY - 10);
+      ctx.lineTo(sunX + 10, sunY - 5);
+      ctx.lineTo(sunX + 12, sunY + 2);
+      // Bottom crack
+      ctx.moveTo(sunX - 12, sunY + 10);
+      ctx.lineTo(sunX - 15, sunY + 15);
       ctx.stroke();
     } else {
       // Normal/Animated Sun
-      const jitter = gameState.sunState === 'falling' ? Math.sin(time * 50) * 2 : 0;
+      const jitter = gameState.sunState === 'falling' ? Math.sin(time * 50) * 3 : 0;
       ctx.fillStyle = gameState.sunState === 'dead' ? '#DDDD99' : '#FFFF55';
       ctx.beginPath();
-      ctx.arc(sunX + jitter, sunY + jitter, 20, 0, Math.PI * 2);
+      ctx.arc(sunX + jitter, sunY + jitter, baseRadius, 0, Math.PI * 2);
       ctx.fill();
+
+      // Sweat drops for falling state
+      if (gameState.sunState === 'falling') {
+        ctx.fillStyle = '#33AAFF';
+        for (let i = 0; i < 3; i++) {
+          const dropX = sunX + (i === 0 ? -25 : i === 1 ? 25 : 0) + Math.sin(time * 10 + i) * 5;
+          const dropY = sunY - 10 + ((time * 20 + i * 10) % 40);
+          ctx.beginPath();
+          ctx.arc(dropX, dropY, 3, 0, Math.PI * 2);
+          ctx.fill();
+          // Drop tip
+          ctx.beginPath();
+          ctx.moveTo(dropX - 3, dropY);
+          ctx.lineTo(dropX, dropY - 6);
+          ctx.lineTo(dropX + 3, dropY);
+          ctx.fill();
+        }
+      }
 
       // Eyes
       ctx.strokeStyle = '#000000';
@@ -1155,18 +1209,28 @@ export default function App() {
         drawX(sunX + 8, sunY - 5);
       } else if (gameState.sunState === 'falling') {
         // Panicked Eyes
-        const eyeJitter = Math.sin(time * 30) * 3;
+        const eyeJitter = Math.sin(time * 40) * 4;
         ctx.fillStyle = '#FFF';
         ctx.beginPath();
-        ctx.arc(sunX - 8, sunY - 5, 6, 0, Math.PI * 2);
-        ctx.arc(sunX + 8, sunY - 5, 6, 0, Math.PI * 2);
+        ctx.arc(sunX - 8, sunY - 5, 7, 0, Math.PI * 2);
+        ctx.arc(sunX + 8, sunY - 5, 7, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
         ctx.fillStyle = '#000';
         ctx.beginPath();
-        ctx.arc(sunX - 8 + eyeJitter, sunY - 5 + eyeJitter, 2, 0, Math.PI * 2);
-        ctx.arc(sunX + 8 - eyeJitter, sunY - 5 - eyeJitter, 2, 0, Math.PI * 2);
+        ctx.arc(sunX - 8 + eyeJitter, sunY - 5 + eyeJitter, 3, 0, Math.PI * 2);
+        ctx.arc(sunX + 8 - eyeJitter, sunY - 5 - eyeJitter, 3, 0, Math.PI * 2);
         ctx.fill();
+        
+        // Eyebrows
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(sunX - 15, sunY - 15 + Math.sin(time * 20) * 2);
+        ctx.lineTo(sunX - 5, sunY - 12);
+        ctx.moveTo(sunX + 15, sunY - 15 + Math.sin(time * 20 + 1) * 2);
+        ctx.lineTo(sunX + 5, sunY - 12);
+        ctx.stroke();
       } else {
         // Normal/Surprised
         const isBlinking = Math.sin(time * 0.5) > 0.98;
@@ -1188,16 +1252,17 @@ export default function App() {
       // Mouth
       ctx.strokeStyle = '#000';
       if (gameState.sunState === 'falling') {
-        // Large Screaming Mouth
+        // Large Screaming Mouth with shake
         ctx.fillStyle = '#400';
+        const mouthShake = Math.sin(time * 60) * 2;
         ctx.beginPath();
-        ctx.ellipse(sunX, sunY + 10, 8, 10, 0, 0, Math.PI * 2);
+        ctx.ellipse(sunX + mouthShake, sunY + 10, 9, 12, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
         // Tongue
         ctx.fillStyle = '#f55';
         ctx.beginPath();
-        ctx.arc(sunX, sunY + 16, 4, 0, Math.PI, true);
+        ctx.arc(sunX + mouthShake, sunY + 18, 5, 0, Math.PI, true);
         ctx.fill();
       } else if (gameState.sunState === 'surprised') {
         ctx.beginPath();
