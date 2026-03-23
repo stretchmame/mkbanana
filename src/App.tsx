@@ -137,7 +137,6 @@ export default function App() {
   const gameContainerRef = useRef<HTMLDivElement>(null);
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [showStartScreen, setShowStartScreen] = useState(true);
-  const [hasInteracted, setHasInteracted] = useState(false);
   const [gravityInput, setGravityInput] = useState('9.8');
   const [p1NameInput, setP1NameInput] = useState('玩家一');
   const [p2NameInput, setP2NameInput] = useState('玩家二');
@@ -300,7 +299,6 @@ export default function App() {
 
   // Sound Effects Trigger
   useEffect(() => {
-    if (!hasInteracted) return;
     if (showStartScreen) {
       soundService.playIntro();
       soundService.stopBGM();
@@ -309,7 +307,7 @@ export default function App() {
     } else {
       soundService.stopBGM();
     }
-  }, [showStartScreen, !!gameState, hasInteracted]);
+  }, [showStartScreen, !!gameState]);
 
   useEffect(() => {
     if (!gameState) return;
@@ -2009,23 +2007,7 @@ export default function App() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="absolute inset-0 bg-[#0000AA] z-50 flex flex-col items-center justify-center p-8 overflow-hidden"
-              onClick={() => {
-                if (!hasInteracted) {
-                  setHasInteracted(true);
-                }
-              }}
             >
-              {!hasInteracted && (
-                <motion.div 
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="absolute inset-0 bg-black/80 z-[60] flex items-center justify-center cursor-pointer"
-                >
-                  <div className="text-white text-4xl font-bold animate-pulse text-center px-4">
-                    點擊開始遊戲
-                  </div>
-                </motion.div>
-              )}
               <div className="relative mb-12">
                 <BananaOrbit />
                 <motion.h1 
