@@ -6,7 +6,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Building, GameState, Point, CANVAS_WIDTH, CANVAS_HEIGHT, MONKEY_SIZE, GRAVITY, Treasure, ProjectileType, Destruction, ParticleType, Particle, Meteor } from './types';
 import { motion, AnimatePresence } from 'motion/react';
-import { Trophy, Wind, RotateCcw, Play, Maximize, Minimize } from 'lucide-react';
+import { Trophy, Wind, RotateCcw, Play, Maximize, Minimize, Volume2, VolumeX } from 'lucide-react';
 import { soundService } from './services/soundService';
 
 const COLORS = ['#AAAAAA', '#00AAAA', '#AA0000'];
@@ -143,6 +143,7 @@ export default function App() {
   const [p2NameInput, setP2NameInput] = useState('玩家二');
   const [message, setMessage] = useState<string>('');
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isMuted, setIsMuted] = useState(soundService.isMuted());
   const lastWindowToggle = useRef<number>(0);
   const nextGameStarter = useRef<1 | 2>(1);
 
@@ -169,6 +170,12 @@ export default function App() {
     } else {
       document.exitFullscreen();
     }
+  };
+
+  const toggleMute = () => {
+    const newMuted = !isMuted;
+    setIsMuted(newMuted);
+    soundService.setMuted(newMuted);
   };
 
   // Initialize Game
@@ -2037,6 +2044,16 @@ export default function App() {
                 className="retro-button text-4xl px-12 py-6 mb-12"
               >
                 開始遊戲
+              </motion.button>
+
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                onClick={toggleMute}
+                className="retro-button flex items-center gap-3 px-8 py-4 mb-12"
+              >
+                {isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
+                {isMuted ? '音效: 關閉' : '音效: 開啟'}
               </motion.button>
 
               <div className="flex flex-col md:flex-row gap-8 mb-12 w-full max-w-2xl px-4">

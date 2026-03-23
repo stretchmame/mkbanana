@@ -5,8 +5,21 @@
 
 class SoundService {
   private ctx: AudioContext | null = null;
+  private muted: boolean = false;
+
+  setMuted(muted: boolean) {
+    this.muted = muted;
+    if (muted) {
+      this.stopBGM();
+    }
+  }
+
+  isMuted() {
+    return this.muted;
+  }
 
   private init() {
+    if (this.muted) return;
     if (!this.ctx) {
       this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
     }
@@ -16,6 +29,7 @@ class SoundService {
   }
 
   playThrow() {
+    if (this.muted) return;
     this.init();
     if (!this.ctx) return;
     const osc = this.ctx.createOscillator();
@@ -36,6 +50,7 @@ class SoundService {
   }
 
   playExplosion() {
+    if (this.muted) return;
     this.init();
     if (!this.ctx) return;
     const bufferSize = this.ctx.sampleRate * 0.5;
@@ -67,6 +82,7 @@ class SoundService {
   }
 
   playMelting() {
+    if (this.muted) return;
     this.init();
     if (!this.ctx) return;
     const bufferSize = this.ctx.sampleRate * 1.0;
@@ -109,6 +125,7 @@ class SoundService {
   }
 
   playHit() {
+    if (this.muted) return;
     this.init();
     if (!this.ctx) return;
     // Similar to explosion but sharper
@@ -130,6 +147,7 @@ class SoundService {
   }
 
   playVictory() {
+    if (this.muted) return;
     this.init();
     if (!this.ctx) return;
     const notes = [261.63, 329.63, 392.00, 523.25]; // C4, E4, G4, C5
@@ -153,6 +171,7 @@ class SoundService {
   }
 
   playPull() {
+    if (this.muted) return;
     this.init();
     if (!this.ctx) return;
     const osc = this.ctx.createOscillator();
@@ -176,6 +195,7 @@ class SoundService {
   private isBgmPlaying = false;
 
   playSunHit() {
+    if (this.muted) return;
     this.init();
     if (!this.ctx) return;
     // "Oh-oh" sound: two notes
@@ -209,6 +229,7 @@ class SoundService {
   }
 
   playIntro() {
+    if (this.muted) return;
     this.init();
     if (!this.ctx) return;
     const now = this.ctx.currentTime;
@@ -258,6 +279,7 @@ class SoundService {
   }
 
   startBGM() {
+    if (this.muted) return;
     this.init();
     if (!this.ctx || this.isBgmPlaying) return;
     this.isBgmPlaying = true;
@@ -276,7 +298,7 @@ class SoundService {
 
     let step = 0;
     const playStep = () => {
-      if (!this.isBgmPlaying || !this.ctx) return;
+      if (!this.isBgmPlaying || !this.ctx || this.muted) return;
       
       const freq = melody[step % melody.length];
       if (freq > 0) {
