@@ -146,6 +146,15 @@ export default function App() {
   const lastWindowToggle = useRef<number>(0);
   const nextGameStarter = useRef<1 | 2>(1);
 
+  const calculateScore = (hitPos: Point, shooterPos: Point, targetPos: Point) => {
+    const distBetween = Math.sqrt((shooterPos.x - targetPos.x) ** 2 + (shooterPos.y - targetPos.y) ** 2);
+    if (distBetween < 1) return 0;
+    const distToTarget = Math.sqrt((hitPos.x - targetPos.x) ** 2 + (hitPos.y - targetPos.y) ** 2);
+    const distToSelf = Math.sqrt((hitPos.x - shooterPos.x) ** 2 + (hitPos.y - shooterPos.y) ** 2);
+    if (distToSelf < 30) return 0;
+    return Math.max(0, Math.floor(100 * (1 - distToTarget / distBetween)));
+  };
+
   useEffect(() => {
     const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
@@ -265,6 +274,8 @@ export default function App() {
         treasures,
         player1Projectile: prev?.player1Projectile || 'normal',
         player2Projectile: prev?.player2Projectile || 'normal',
+        roundHistory: resetScores ? { p1: [], p2: [] } : (prev?.roundHistory || { p1: [], p2: [] }),
+        currentRoundPoints: [0, 0],
       };
     });
     const pNames = [p1NameInput || '玩家一', p2NameInput || '玩家二'];
@@ -327,12 +338,18 @@ export default function App() {
       const timer = setTimeout(() => {
         setGameState(prev => {
           if (!prev) return null;
+          
+          const newHistory = {
+            p1: [...prev.roundHistory.p1, prev.currentRoundPoints[0]],
+            p2: [...prev.roundHistory.p2, prev.currentRoundPoints[1]]
+          };
+
           const winner1 = prev.scores[0] >= 2;
           const winner2 = prev.scores[1] >= 2;
           if (winner1 || winner2) {
-            return { ...prev, status: 'tournamentOver', tournamentWinner: winner1 ? 1 : 2 };
+            return { ...prev, status: 'tournamentOver', tournamentWinner: winner1 ? 1 : 2, roundHistory: newHistory };
           }
-          return { ...prev, status: 'roundOver' };
+          return { ...prev, status: 'roundOver', roundHistory: newHistory };
         });
       }, 2000);
       return () => clearTimeout(timer);
@@ -561,11 +578,15 @@ export default function App() {
             const winner = p1Hit ? 2 : 1;
             const newScores: [number, number] = [prev.scores[0], prev.scores[1]];
             newScores[winner - 1]++;
+            const newPoints = [...prev.currentRoundPoints] as [number, number];
+            newPoints[winner - 1] += 100;
+            newPoints[p1Hit ? 0 : 1] = 0;
             return {
               ...next,
               status: 'celebrating',
               winner,
               scores: newScores,
+              currentRoundPoints: newPoints,
               meteorShower: undefined,
               destructions: newDestructions,
               particles: newParticles
@@ -685,16 +706,22 @@ export default function App() {
               // Self hit: opponent wins immediately
               const winner = prev.currentPlayer === 1 ? 2 : 1;
               newScores[winner - 1]++;
+              const newPoints = [...prev.currentRoundPoints] as [number, number];
+              newPoints[prev.currentPlayer - 1] = 0;
               return {
                 ...next,
                 status: 'celebrating',
                 winner,
                 scores: newScores,
+                currentRoundPoints: newPoints,
                 banana: undefined,
               };
             } else {
               newScores[prev.currentPlayer - 1]++;
             }
+
+            const newPoints = [...prev.currentRoundPoints] as [number, number];
+            newPoints[prev.currentPlayer - 1] += 100;
 
             // Generate Particles
             const particleCount = prev.banana.type === 'giant' ? 150 : (prev.banana.type === 'acid' ? 100 : 60);
@@ -741,6 +768,7 @@ export default function App() {
               ...next, 
               status: 'exploding', 
               scores: newScores, 
+              currentRoundPoints: newPoints,
               explosion: { 
                 pos: newPos, 
                 radius: 0, 
@@ -839,6 +867,11 @@ export default function App() {
                     maxRadius: prev.banana.type === 'acid' ? 150 : (prev.banana.type === 'giant' ? 300 : 30),
                     type: prev.banana.type
                   },
+                  currentRoundPoints: (() => {
+                    const p = [...prev.currentRoundPoints] as [number, number];
+                    p[prev.currentPlayer - 1] += calculateScore(newPos, selfMonkey, targetMonkey);
+                    return p;
+                  })(),
                   destructions: [...prev.destructions, { pos: newPos, radius: prev.banana.type === 'acid' ? 80 : (prev.banana.type === 'giant' ? 150 : 15) }],
                   particles: [...next.particles, ...newParticles],
                   shake: prev.banana.type === 'normal' ? 15 : 45
@@ -2095,6 +2128,11 @@ export default function App() {
                   {gameState.player1Projectile === 'giant' ? '十倍大香蕉' : gameState.player1Projectile === 'acid' ? '硫酸瓶' : gameState.player1Projectile === 'beam' ? '導引光束' : gameState.player1Projectile === 'meteor' ? '火熱隕石' : '香蕉'}
                 </div>
               )}
+              {gameState && (
+                <div className="mt-1 text-[10px] bg-blue-600/40 text-white px-1 font-bold border-t border-white/20 pt-1">
+                  本回合得分: {gameState.currentRoundPoints[0]}
+                </div>
+              )}
             </div>
           </div>
 
@@ -2106,6 +2144,11 @@ export default function App() {
               {gameState && (
                 <div className={`text-[10px] px-1 font-bold inline-block ${gameState.player2Projectile !== 'normal' ? 'bg-yellow-400 text-black animate-pulse' : 'bg-white/20 text-white'}`}>
                   {gameState.player2Projectile === 'giant' ? '十倍大香蕉' : gameState.player2Projectile === 'acid' ? '硫酸瓶' : gameState.player2Projectile === 'beam' ? '導引光束' : gameState.player2Projectile === 'meteor' ? '火熱隕石' : '香蕉'}
+                </div>
+              )}
+              {gameState && (
+                <div className="mt-1 text-[10px] bg-blue-600/40 text-white px-1 font-bold border-t border-white/20 pt-1">
+                  本回合得分: {gameState.currentRoundPoints[1]}
                 </div>
               )}
             </div>
@@ -2250,7 +2293,18 @@ export default function App() {
                   <p className="text-sm text-red-400 mb-6 italic">哎呀！打到自己了！</p>
                 )}
                 <div className="mb-8">
-                  <div className="text-sm opacity-70 uppercase mb-2">目前比分</div>
+                  <div className="text-sm opacity-70 uppercase mb-2">本回合得分</div>
+                  <div className="flex justify-center gap-8 mb-4">
+                    <div className="text-center">
+                      <div className="text-[10px] opacity-70">{gameState.playerNames[0]}</div>
+                      <div className="text-2xl font-bold text-white">{gameState.currentRoundPoints[0]}</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-[10px] opacity-70">{gameState.playerNames[1]}</div>
+                      <div className="text-2xl font-bold text-white">{gameState.currentRoundPoints[1]}</div>
+                    </div>
+                  </div>
+                  <div className="text-sm opacity-70 uppercase mb-2">目前總比分</div>
                   <div className="text-3xl font-bold text-yellow-400">
                     {gameState.scores[0]} : {gameState.scores[1]}
                   </div>
@@ -2296,10 +2350,43 @@ export default function App() {
                   initial={{ scale: 0.5, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   transition={{ delay: 0.8 }}
-                  className="text-3xl text-yellow-400 font-bold mb-12"
+                  className="text-3xl text-yellow-400 font-bold mb-8"
                 >
                   {gameState.tournamentWinner === 1 ? gameState.playerNames[0] : gameState.playerNames[1]} 統治了城市！
                 </motion.p>
+
+                {/* Round History Table */}
+                <motion.div
+                  initial={{ y: 20, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  transition={{ delay: 1 }}
+                  className="bg-black/40 border-2 border-white/30 p-4 mb-12 w-full max-w-md"
+                >
+                  <h3 className="text-sm uppercase opacity-70 mb-4 text-center">每回合得分比較</h3>
+                  <div className="grid grid-cols-3 gap-4 text-center border-b border-white/20 pb-2 mb-2">
+                    <div className="text-[10px] uppercase opacity-50">回合</div>
+                    <div className="text-xs font-bold truncate">{gameState.playerNames[0]}</div>
+                    <div className="text-xs font-bold truncate">{gameState.playerNames[1]}</div>
+                  </div>
+                  <div className="max-h-40 overflow-y-auto custom-scrollbar">
+                    {gameState.roundHistory.p1.map((p1Score, idx) => (
+                      <div key={idx} className="grid grid-cols-3 gap-4 text-center py-1 border-b border-white/5 last:border-0">
+                        <div className="text-xs opacity-50">{idx + 1}</div>
+                        <div className={`text-sm ${p1Score > gameState.roundHistory.p2[idx] ? 'text-yellow-400 font-bold' : 'text-white'}`}>
+                          {p1Score}
+                        </div>
+                        <div className={`text-sm ${gameState.roundHistory.p2[idx] > p1Score ? 'text-yellow-400 font-bold' : 'text-white'}`}>
+                          {gameState.roundHistory.p2[idx]}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-3 gap-4 text-center pt-2 mt-2 border-t border-white/20 font-bold">
+                    <div className="text-xs uppercase opacity-50">總計</div>
+                    <div className="text-yellow-400">{gameState.roundHistory.p1.reduce((a, b) => a + b, 0)}</div>
+                    <div className="text-yellow-400">{gameState.roundHistory.p2.reduce((a, b) => a + b, 0)}</div>
+                  </div>
+                </motion.div>
 
                 <button
                   onClick={handleResetToStart}

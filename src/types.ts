@@ -87,6 +87,8 @@ export interface GameState {
   player1Projectile: ProjectileType;
   player2Projectile: ProjectileType;
   meteorShower?: MeteorShower;
+  roundHistory: { p1: number[], p2: number[] };
+  currentRoundPoints: [number, number];
   banana?: {
     pos: Point;
     vel: Point;
