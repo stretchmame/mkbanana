@@ -2315,8 +2315,9 @@ export default function App() {
                 </button>
               </div>
 
-              <div className="absolute bottom-4 right-4 text-xs opacity-50">
-                ＡＮＴＹＥＨ修正
+              <div className="absolute bottom-4 right-4 text-xs opacity-50 text-right">
+                <div>ＡＮＴＹＥＨ修正</div>
+                <div className="text-[10px] mt-1">v1.2.5</div>
               </div>
             </motion.div>
           )}
