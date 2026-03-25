@@ -142,6 +142,7 @@ export default function App() {
   const [p2NameInput, setP2NameInput] = useState('玩家二');
   const [message, setMessage] = useState<string>('');
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isPseudoFullscreen, setIsPseudoFullscreen] = useState(false);
   const [isMuted, setIsMuted] = useState(soundService.isMuted());
   const lastWindowToggle = useRef<number>(0);
   const nextGameStarter = useRef<1 | 2>(1);
@@ -266,7 +267,11 @@ export default function App() {
 
   useEffect(() => {
     const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+      const isFull = !!document.fullscreenElement;
+      setIsFullscreen(isFull);
+      if (!isFull) {
+        setIsPseudoFullscreen(false);
+      }
     };
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
@@ -280,12 +285,18 @@ export default function App() {
   }, []);
 
   const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
+    if (!document.fullscreenElement && !isPseudoFullscreen) {
       gameContainerRef.current?.requestFullscreen().catch(err => {
-        console.error(`Error attempting to enable full-screen mode: ${err.message}`);
+        console.warn(`Real fullscreen failed, using pseudo-fullscreen: ${err.message}`);
+        setIsPseudoFullscreen(true);
+        setIsFullscreen(true);
       });
     } else {
-      document.exitFullscreen();
+      if (document.fullscreenElement) {
+        document.exitFullscreen();
+      }
+      setIsPseudoFullscreen(false);
+      setIsFullscreen(false);
     }
   };
 
@@ -403,9 +414,11 @@ export default function App() {
     initGame(scaledG);
     
     // Enter fullscreen
-    if (!document.fullscreenElement) {
+    if (!document.fullscreenElement && !isPseudoFullscreen) {
       gameContainerRef.current?.requestFullscreen().catch(err => {
-        console.error(`Error attempting to enable full-screen mode: ${err.message}`);
+        console.warn(`Auto fullscreen failed, using pseudo-fullscreen: ${err.message}`);
+        setIsPseudoFullscreen(true);
+        setIsFullscreen(true);
       });
     }
   };
@@ -2164,8 +2177,11 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4">
-      <div ref={gameContainerRef} className="game-container relative bg-black border-4 border-[#AAAAAA] shadow-2xl overflow-hidden">
+    <div className="min-h-screen flex flex-col items-center justify-center p-0 md:p-4 bg-[#0000AA]">
+      <div 
+        ref={gameContainerRef} 
+        className={`game-container relative bg-black md:border-4 border-[#AAAAAA] shadow-2xl overflow-hidden ${isFullscreen || isPseudoFullscreen ? 'pseudo-fullscreen' : ''}`}
+      >
         <div className="game-content relative w-full h-full flex flex-col items-center justify-center">
           {/* Header / Scores & Controls */}
           <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-start z-20 pointer-events-none">
@@ -2242,14 +2258,14 @@ export default function App() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-[#0000AA] z-50 flex flex-col items-center justify-center p-8 overflow-hidden"
+              className="absolute inset-0 bg-[#0000AA] z-50 flex flex-col items-center justify-start md:justify-center p-4 md:p-8 overflow-y-auto"
             >
-              <div className="relative mb-12">
+              <div className="relative mb-4 md:mb-12 mt-4 md:mt-0">
                 <BananaOrbit />
                 <motion.h1 
                   initial={{ y: -50, scale: 0.5 }}
                   animate={{ y: 0, scale: 1 }}
-                  className="text-7xl md:text-9xl font-bold text-yellow-400 drop-shadow-[0_8px_0_rgba(0,0,0,1)] text-center relative z-10"
+                  className="text-5xl md:text-9xl font-bold text-yellow-400 drop-shadow-[0_4px_0_rgba(0,0,0,1)] md:drop-shadow-[0_8px_0_rgba(0,0,0,1)] text-center relative z-10"
                 >
                   猴子丟香蕉
                 </motion.h1>
@@ -2259,7 +2275,7 @@ export default function App() {
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
                 onClick={handleStartGame}
-                className="retro-button text-4xl px-12 py-6 mb-12"
+                className="retro-button text-2xl md:text-4xl px-8 md:px-12 py-4 md:py-6 mb-4 md:mb-12"
               >
                 開始遊戲
               </motion.button>
@@ -2268,55 +2284,54 @@ export default function App() {
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
                 onClick={toggleMute}
-                className="retro-button flex items-center gap-3 px-8 py-4 mb-12"
+                className="retro-button flex items-center gap-3 px-6 md:px-8 py-3 md:py-4 mb-4 md:mb-12 text-sm md:text-base"
               >
-                {isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
+                {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
                 {isMuted ? '音效: 關閉' : '音效: 開啟'}
               </motion.button>
 
-              <div className="flex flex-col md:flex-row gap-8 mb-12 w-full max-w-2xl px-4">
-                <div className="flex-1 flex flex-col gap-2">
-                  <label className="text-sm uppercase opacity-70 text-center">玩家一 名稱</label>
+              <div className="flex flex-col md:flex-row gap-4 md:gap-8 mb-4 md:mb-12 w-full max-w-2xl px-4">
+                <div className="flex-1 flex flex-col gap-1 md:gap-2">
+                  <label className="text-[10px] md:text-sm uppercase opacity-70 text-center">玩家一 名稱</label>
                   <input
                     type="text"
                     value={p1NameInput}
                     onChange={(e) => setP1NameInput(e.target.value)}
                     placeholder="玩家一"
-                    className="retro-input w-full text-center text-xl"
+                    className="retro-input w-full text-center text-lg md:text-xl"
                   />
                 </div>
-                <div className="flex-1 flex flex-col gap-2">
-                  <label className="text-sm uppercase opacity-70 text-center">玩家二 名稱</label>
+                <div className="flex-1 flex flex-col gap-1 md:gap-2">
+                  <label className="text-[10px] md:text-sm uppercase opacity-70 text-center">玩家二 名稱</label>
                   <input
                     type="text"
                     value={p2NameInput}
                     onChange={(e) => setP2NameInput(e.target.value)}
                     placeholder="玩家二"
-                    className="retro-input w-full text-center text-xl"
+                    className="retro-input w-full text-center text-lg md:text-xl"
                   />
                 </div>
               </div>
 
-              <div className="mt-auto w-full flex flex-col items-center gap-4">
-                <div className="flex flex-col items-center gap-2">
-                  <label className="text-sm uppercase opacity-70">重力值設定</label>
-                  <div className="flex items-center gap-3">
+              <div className="mt-auto w-full flex flex-col items-center gap-2 md:gap-4 pb-8 md:pb-0">
+                <div className="flex flex-col items-center gap-1 md:gap-2">
+                  <label className="text-[10px] md:text-sm uppercase opacity-70">重力值設定</label>
+                  <div className="flex items-center gap-2 md:gap-3">
                     <input
                       type="number"
                       step="0.1"
                       value={gravityInput}
                       onChange={(e) => setGravityInput(e.target.value)}
                       placeholder="預設地球Ｇ=9.8"
-                      className="retro-input w-48 text-center text-xl"
+                      className="retro-input w-32 md:w-48 text-center text-lg md:text-xl"
                     />
-                    <span className="text-xl opacity-50">m/s²</span>
+                    <span className="text-lg md:text-xl opacity-50">m/s²</span>
                   </div>
-                  <p className="text-[10px] opacity-50 mt-1">預設地球Ｇ=9.8</p>
                 </div>
 
                 <button
                   onClick={toggleFullscreen}
-                  className="retro-button text-sm px-6 py-2 mt-4"
+                  className="retro-button text-xs md:text-sm px-4 md:px-6 py-2 mt-2 md:mt-4"
                 >
                   {isFullscreen ? '退出全螢幕' : '全螢幕'}
                 </button>
