@@ -89,6 +89,10 @@ export interface GameState {
   meteorShower?: MeteorShower;
   roundHistory: { p1: number[], p2: number[] };
   currentRoundPoints: [number, number];
+  p1GroundTurns: number;
+  p2GroundTurns: number;
+  p1Struggling: boolean;
+  p2Struggling: boolean;
   banana?: {
     pos: Point;
     vel: Point;

@@ -155,6 +155,115 @@ export default function App() {
     return Math.max(0, Math.floor(100 * (1 - distToTarget / distBetween)));
   };
 
+  const handleTurnTransition = (prev: GameState, next: GameState): GameState => {
+    const nextPlayer = prev.currentPlayer === 1 ? 2 : 1;
+    
+    const p1GroundY = getGroundY(next.player1Pos.x, next.buildings, next.destructions);
+    const p2GroundY = getGroundY(next.player2Pos.x, next.buildings, next.destructions);
+    
+    const p1IsOnGround = p1GroundY >= CANVAS_HEIGHT - 10;
+    const p2IsOnGround = p2GroundY >= CANVAS_HEIGHT - 10;
+    
+    let p1Turns = next.p1GroundTurns;
+    let p2Turns = next.p2GroundTurns;
+    
+    // Update turns based on current ground status
+    if (p1IsOnGround) {
+      if (nextPlayer === 1) p1Turns++;
+    } else {
+      p1Turns = 0;
+    }
+
+    if (p2IsOnGround) {
+      if (nextPlayer === 2) p2Turns++;
+    } else {
+      p2Turns = 0;
+    }
+    
+    if (p1Turns >= 5) {
+      const explosionPos = next.player1Pos;
+      const newScores: [number, number] = [next.scores[0], next.scores[1]];
+      newScores[1]++;
+      soundService.playExplosion();
+      return {
+        ...next,
+        status: 'exploding',
+        winner: 2,
+        scores: newScores,
+        explosion: {
+          pos: explosionPos,
+          radius: 0,
+          maxRadius: 300,
+          type: 'giant'
+        },
+        shake: 50,
+        p1GroundTurns: 0,
+        p2GroundTurns: 0,
+        banana: undefined
+      };
+    }
+    
+    if (p2Turns >= 5) {
+      const explosionPos = next.player2Pos;
+      const newScores: [number, number] = [next.scores[0], next.scores[1]];
+      newScores[0]++;
+      soundService.playExplosion();
+      return {
+        ...next,
+        status: 'exploding',
+        winner: 1,
+        scores: newScores,
+        explosion: {
+          pos: explosionPos,
+          radius: 0,
+          maxRadius: 300,
+          type: 'giant'
+        },
+        shake: 50,
+        p1GroundTurns: 0,
+        p2GroundTurns: 0,
+        banana: undefined
+      };
+    }
+
+    // Spawn new treasure for next round
+    const newTreasures: Treasure[] = [];
+    let treasureType: 'giant' | 'acid' | 'beam' | 'meteor';
+    const rand = Math.random();
+    if (next.roundCount >= 9) {
+      if (rand < 0.07) treasureType = 'meteor';
+      else if (rand < 0.38) treasureType = 'giant';
+      else if (rand < 0.69) treasureType = 'acid';
+      else treasureType = 'beam';
+    } else {
+      if (rand < 0.07) treasureType = 'meteor';
+      else if (rand < 0.535) treasureType = 'giant';
+      else treasureType = 'acid';
+    }
+    newTreasures.push({
+      id: Date.now(),
+      pos: {
+        x: 100 + Math.random() * (CANVAS_WIDTH - 200),
+        y: 50 + Math.random() * 250
+      },
+      type: treasureType,
+      active: true
+    });
+
+    return {
+      ...next,
+      status: 'aiming',
+      currentPlayer: nextPlayer,
+      p1GroundTurns: p1Turns,
+      p2GroundTurns: p2Turns,
+      p1Struggling: p1Turns >= 4,
+      p2Struggling: p2Turns >= 4,
+      treasures: newTreasures,
+      banana: undefined,
+      explosion: undefined
+    };
+  };
+
   useEffect(() => {
     const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
@@ -276,6 +385,10 @@ export default function App() {
         player2Projectile: prev?.player2Projectile || 'normal',
         roundHistory: resetScores ? { p1: [], p2: [] } : (prev?.roundHistory || { p1: [], p2: [] }),
         currentRoundPoints: [0, 0],
+        p1GroundTurns: 0,
+        p2GroundTurns: 0,
+        p1Struggling: false,
+        p2Struggling: false,
       };
     });
     const pNames = [p1NameInput || '玩家一', p2NameInput || '玩家二'];
@@ -465,37 +578,7 @@ export default function App() {
           const elapsed = Date.now() - prev.meteorShower.startTime;
           
           if (elapsed > prev.meteorShower.duration) {
-            // Spawn new treasure for next round
-            const newTreasures: Treasure[] = [];
-            let treasureType: 'giant' | 'acid' | 'beam' | 'meteor';
-            const rand = Math.random();
-            if (prev.roundCount >= 9) {
-              if (rand < 0.07) treasureType = 'meteor';
-              else if (rand < 0.38) treasureType = 'giant';
-              else if (rand < 0.69) treasureType = 'acid';
-              else treasureType = 'beam';
-            } else {
-              if (rand < 0.07) treasureType = 'meteor';
-              else if (rand < 0.535) treasureType = 'giant';
-              else treasureType = 'acid';
-            }
-            newTreasures.push({
-              id: Date.now(),
-              pos: {
-                x: 100 + Math.random() * (CANVAS_WIDTH - 200),
-                y: 50 + Math.random() * 250
-              },
-              type: treasureType,
-              active: true
-            });
-
-            return {
-              ...next,
-              status: 'aiming',
-              meteorShower: undefined,
-              currentPlayer: prev.currentPlayer === 1 ? 2 : 1,
-              treasures: newTreasures
-            };
+            return handleTurnTransition(prev, next);
           }
 
           // Warning period (first 1s)
@@ -641,37 +724,7 @@ export default function App() {
 
           // 1. Out of bounds
           if (newPos.x < 0 || newPos.x > CANVAS_WIDTH || newPos.y > CANVAS_HEIGHT) {
-            // Spawn new treasure for next round
-            const newTreasures: Treasure[] = [];
-            let treasureType: 'giant' | 'acid' | 'beam' | 'meteor';
-            const rand = Math.random();
-            if (prev.roundCount >= 9) {
-              if (rand < 0.07) treasureType = 'meteor';
-              else if (rand < 0.38) treasureType = 'giant';
-              else if (rand < 0.69) treasureType = 'acid';
-              else treasureType = 'beam';
-            } else {
-              if (rand < 0.07) treasureType = 'meteor';
-              else if (rand < 0.535) treasureType = 'giant';
-              else treasureType = 'acid';
-            }
-            newTreasures.push({
-              id: Date.now(),
-              pos: {
-                x: 100 + Math.random() * (CANVAS_WIDTH - 200),
-                y: 50 + Math.random() * 250
-              },
-              type: treasureType,
-              active: true
-            });
-
-            return { 
-              ...next, 
-              status: 'aiming', 
-              banana: undefined, 
-              currentPlayer: prev.currentPlayer === 1 ? 2 : 1, 
-              treasures: newTreasures
-            };
+            return handleTurnTransition(prev, next);
           }
 
           // 1.5 Hit Sun
@@ -936,38 +989,7 @@ export default function App() {
                return { ...next, status: 'celebrating', winner, explosion: undefined };
             }
 
-            // Spawn new treasure for next round
-            const newTreasures: Treasure[] = [];
-            let treasureType: 'giant' | 'acid' | 'beam' | 'meteor';
-            const rand = Math.random();
-            if (prev.roundCount >= 9) {
-              if (rand < 0.07) treasureType = 'meteor';
-              else if (rand < 0.38) treasureType = 'giant';
-              else if (rand < 0.69) treasureType = 'acid';
-              else treasureType = 'beam';
-            } else {
-              if (rand < 0.07) treasureType = 'meteor';
-              else if (rand < 0.535) treasureType = 'giant';
-              else treasureType = 'acid';
-            }
-            newTreasures.push({
-              id: Date.now(),
-              pos: {
-                x: 100 + Math.random() * (CANVAS_WIDTH - 200),
-                y: 50 + Math.random() * 250
-              },
-              type: treasureType,
-              active: true
-            });
-
-            return {
-              ...next,
-              status: 'aiming',
-              explosion: undefined,
-              banana: undefined,
-              currentPlayer: prev.currentPlayer === 1 ? 2 : 1,
-              treasures: newTreasures
-            };
+            return handleTurnTransition(prev, next);
           }
           return {
             ...next,
@@ -1524,7 +1546,7 @@ export default function App() {
     }
 
     // Draw Monkeys
-    const drawMonkey = (pos: Point, color: string, isThrowing: boolean, isPlayer1: boolean, isWinner: boolean, isDead: boolean, isActive: boolean, hasUmbrella: boolean = false) => {
+    const drawMonkey = (pos: Point, color: string, isThrowing: boolean, isPlayer1: boolean, isWinner: boolean, isDead: boolean, isActive: boolean, hasUmbrella: boolean = false, groundTurns: number = 0, isStruggling: boolean = false) => {
       if (isActive && !isDead) {
         ctx.save();
         const bounce = Math.sin(Date.now() / 150) * 5;
@@ -1542,8 +1564,30 @@ export default function App() {
         ctx.restore();
       }
 
+      // Countdown display
+      if (groundTurns > 0 && !isDead && !isWinner) {
+        ctx.save();
+        ctx.translate(pos.x, pos.y);
+        ctx.fillStyle = groundTurns >= 4 ? '#FF0000' : '#FFFFFF';
+        ctx.font = 'bold 24px Arial';
+        ctx.textAlign = 'center';
+        ctx.shadowBlur = 5;
+        ctx.shadowColor = '#000000';
+        ctx.fillText(`${5 - groundTurns}`, 0, -60);
+        ctx.restore();
+      }
+
       ctx.save();
-      ctx.translate(pos.x, pos.y);
+      
+      // Struggle animation (shaking)
+      let shakeX = 0;
+      let shakeY = 0;
+      if (isStruggling) {
+        shakeX = (Math.random() - 0.5) * 8;
+        shakeY = (Math.random() - 0.5) * 8;
+      }
+      
+      ctx.translate(pos.x + shakeX, pos.y + shakeY);
       
       if (isDead) {
         ctx.rotate(isPlayer1 ? -Math.PI / 2 : Math.PI / 2);
@@ -1732,8 +1776,8 @@ export default function App() {
     const p1HasUmbrella = gameState.status === 'meteorShower' && gameState.meteorShower?.protectedPlayer === 1;
     const p2HasUmbrella = gameState.status === 'meteorShower' && gameState.meteorShower?.protectedPlayer === 2;
 
-    drawMonkey(gameState.player1Pos, '#FFB84D', p1Throwing, true, p1Winner, p1Dead, p1Active, p1HasUmbrella);
-    drawMonkey(gameState.player2Pos, '#FFB84D', p2Throwing, false, p2Winner, p2Dead, p2Active, p2HasUmbrella);
+    drawMonkey(gameState.player1Pos, '#FFB84D', p1Throwing, true, p1Winner, p1Dead, p1Active, p1HasUmbrella, gameState.p1GroundTurns, gameState.p1Struggling);
+    drawMonkey(gameState.player2Pos, '#FFB84D', p2Throwing, false, p2Winner, p2Dead, p2Active, p2HasUmbrella, gameState.p2GroundTurns, gameState.p2Struggling);
 
     // Draw Banana
     if (gameState.banana) {
