@@ -401,6 +401,13 @@ export default function App() {
     // Scale 9.8 to 0.25
     const scaledG = gVal * (0.25 / 9.8);
     initGame(scaledG);
+    
+    // Enter fullscreen
+    if (!document.fullscreenElement) {
+      gameContainerRef.current?.requestFullscreen().catch(err => {
+        console.error(`Error attempting to enable full-screen mode: ${err.message}`);
+      });
+    }
   };
 
   const handleResetToStart = () => {
