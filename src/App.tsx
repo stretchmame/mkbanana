@@ -143,6 +143,7 @@ export default function App() {
   const [message, setMessage] = useState<string>('');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isPseudoFullscreen, setIsPseudoFullscreen] = useState(false);
+  const [isPortrait, setIsPortrait] = useState(window.innerHeight > window.innerWidth);
   const [isMuted, setIsMuted] = useState(soundService.isMuted());
   const lastWindowToggle = useRef<number>(0);
   const nextGameStarter = useRef<1 | 2>(1);
@@ -273,8 +274,26 @@ export default function App() {
         setIsPseudoFullscreen(false);
       }
     };
+
+    const handleResize = () => {
+      // Update vh variable for mobile
+      const vh = window.innerHeight * 0.01;
+      document.documentElement.style.setProperty('--vh', `${vh}px`);
+      setIsPortrait(window.innerHeight > window.innerWidth);
+    };
+
     document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleResize);
+    
+    // Initial call
+    handleResize();
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+    };
   }, []);
 
   useEffect(() => {
@@ -2339,9 +2358,27 @@ export default function App() {
 
               <div className="absolute bottom-4 right-4 text-xs opacity-50 text-right">
                 <div>ＡＮＴＹＥＨ修正</div>
-                <div className="text-[10px] mt-1">v1.2.5</div>
+                <div className="text-[10px] mt-1">v1.2.8</div>
               </div>
             </motion.div>
+          )}
+
+          {/* Orientation Hint for Mobile */}
+          {isPortrait && (isFullscreen || isPseudoFullscreen) && (
+            <div className="absolute inset-0 z-[100] bg-black/90 flex flex-col items-center justify-center p-8 text-center pointer-events-none md:hidden">
+              <motion.div
+                animate={{ rotate: [0, 90, 0] }}
+                transition={{ duration: 2, repeat: Infinity }}
+                className="mb-4"
+              >
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+                  <line x1="12" y1="18" x2="12.01" y2="18" />
+                </svg>
+              </motion.div>
+              <p className="text-xl font-bold text-yellow-400">請旋轉裝置</p>
+              <p className="text-sm opacity-70 mt-2">橫向畫面可獲得最佳遊戲體驗</p>
+            </div>
           )}
 
           {gameState?.status === 'roundOver' && (

@@ -45,7 +45,7 @@ canvas {
   top: 0;
   left: 0;
   width: 100vw;
-  height: 100vh;
+  height: calc(var(--vh, 1vh) * 100);
   z-index: 9999;
   background-color: black;
   border: none;
@@ -55,8 +55,8 @@ canvas {
 }
 
 .game-container.pseudo-fullscreen .game-content {
-  width: min(100vw, calc(100vh * 800 / 600));
-  height: min(100vh, calc(100vw * 600 / 800));
+  width: min(100vw, calc(calc(var(--vh, 1vh) * 100) * 800 / 600));
+  height: min(calc(var(--vh, 1vh) * 100), calc(100vw * 600 / 800));
   position: relative;
 }
 
