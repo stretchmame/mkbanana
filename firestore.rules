@@ -26,7 +26,7 @@ service cloud.firestore {
     function isValidLeaderboardEntry(data) {
       return data.keys().hasAll(['name', 'score', 'timestamp']) &&
              data.name is string && data.name.size() >= 1 && data.name.size() <= 50 &&
-             data.score is int && data.score >= 0 &&
+             data.score is number && data.score >= 0 &&
              data.timestamp is timestamp;
     }
 

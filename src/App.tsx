@@ -161,6 +161,7 @@ export default function App() {
   const [classInput, setClassInput] = useState('');
   const [numberInput, setNumberInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
   const lastWindowToggle = useRef<number>(0);
   const nextGameStarter = useRef<1 | 2>(1);
   const hasCheckedHighScore = useRef(false);
@@ -581,9 +582,19 @@ export default function App() {
     if (!gradeInput || !classInput || !numberInput || !pendingScore) return;
     
     setIsSubmitting(true);
+    setSubmissionError(null);
+
+    // Timeout after 10 seconds
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('傳送超時，請檢查網路連線')), 10000)
+    );
+
     try {
       const fullName = `${gradeInput}年${classInput}班${numberInput}號`;
-      await saveHighScore(fullName, pendingScore.score);
+      await Promise.race([
+        saveHighScore(fullName, pendingScore.score),
+        timeoutPromise
+      ]);
       setShowScoreEntry(false);
       setPendingScore(null);
       setGradeInput('');
@@ -591,6 +602,7 @@ export default function App() {
       setNumberInput('');
     } catch (err) {
       console.error("Failed to submit score:", err);
+      setSubmissionError(err instanceof Error ? err.message : '傳送失敗，請稍後再試');
     } finally {
       setIsSubmitting(false);
     }
@@ -2751,15 +2763,34 @@ export default function App() {
                             <span className="text-[10px] opacity-50">座號</span>
                           </div>
                         </div>
+                        
+                        {submissionError && (
+                          <p className="text-red-400 text-sm font-bold animate-pulse">{submissionError}</p>
+                        )}
                       </div>
 
-                      <button
-                        onClick={submitHighScore}
-                        disabled={!gradeInput || !classInput || !numberInput || isSubmitting}
-                        className="retro-button w-full flex items-center justify-center gap-2 py-4 disabled:opacity-50"
-                      >
-                        {isSubmitting ? '傳送中...' : <><Send size={20} /> 登錄英雄榜</>}
-                      </button>
+                      <div className="flex flex-col gap-3">
+                        <button
+                          onClick={submitHighScore}
+                          disabled={!gradeInput || !classInput || !numberInput || isSubmitting}
+                          className="retro-button w-full flex items-center justify-center gap-2 py-4 disabled:opacity-50"
+                        >
+                          {isSubmitting ? '傳送中...' : <><Send size={20} /> 登錄英雄榜</>}
+                        </button>
+                        
+                        {!isSubmitting && (
+                          <button 
+                            onClick={() => {
+                              setShowScoreEntry(false);
+                              setPendingScore(null);
+                              setSubmissionError(null);
+                            }}
+                            className="text-white/50 hover:text-white text-sm underline"
+                          >
+                            暫不登錄
+                          </button>
+                        )}
+                      </div>
                     </motion.div>
                   </motion.div>
                 )}
