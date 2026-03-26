@@ -93,6 +93,7 @@ export interface GameState {
   p2GroundTurns: number;
   p1Struggling: boolean;
   p2Struggling: boolean;
+  turnTimeLeft: number;
   banana?: {
     pos: Point;
     vel: Point;

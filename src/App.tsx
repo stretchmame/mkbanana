@@ -260,11 +260,57 @@ export default function App() {
       p2GroundTurns: p2Turns,
       p1Struggling: p1Turns >= 4,
       p2Struggling: p2Turns >= 4,
+      turnTimeLeft: 10,
       treasures: newTreasures,
       banana: undefined,
       explosion: undefined
     };
   };
+
+  useEffect(() => {
+    if (!gameState || gameState.status !== 'aiming') return;
+
+    const timer = setInterval(() => {
+      setGameState(prev => {
+        if (!prev || prev.status !== 'aiming') return prev;
+        
+        const newTime = prev.turnTimeLeft - 1;
+        
+        if (newTime <= 0) {
+          // Player dies
+          const currentPlayer = prev.currentPlayer;
+          const explosionPos = currentPlayer === 1 ? prev.player1Pos : prev.player2Pos;
+          const newScores: [number, number] = [prev.scores[0], prev.scores[1]];
+          newScores[currentPlayer === 1 ? 1 : 0]++; // Opponent wins
+          
+          soundService.playExplosion();
+          
+          return {
+            ...prev,
+            status: 'exploding',
+            winner: currentPlayer === 1 ? 2 : 1,
+            scores: newScores,
+            explosion: {
+              pos: explosionPos,
+              radius: 0,
+              maxRadius: 300,
+              type: 'giant'
+            },
+            shake: 50,
+            turnTimeLeft: 0,
+            banana: undefined
+          };
+        }
+        
+        return {
+          ...prev,
+          turnTimeLeft: newTime
+        };
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [gameState?.status, gameState?.currentPlayer]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -419,6 +465,7 @@ export default function App() {
         p2GroundTurns: 0,
         p1Struggling: false,
         p2Struggling: false,
+        turnTimeLeft: 10,
       };
     });
     const pNames = [p1NameInput || '玩家一', p2NameInput || '玩家二'];
@@ -2206,9 +2253,14 @@ export default function App() {
           <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-start z-20 pointer-events-none">
           {/* Player 1 Side */}
           <div className="flex items-start gap-2">
-            <div className="bg-black/80 p-2 border-2 border-white pointer-events-auto">
+            <div className="bg-black/80 p-2 border-2 border-white pointer-events-auto flex flex-col items-center">
               <div className="text-[10px] uppercase opacity-70 leading-none mb-1">{gameState?.playerNames[0] || '玩家 1'}</div>
               <div className="text-xl font-bold text-yellow-400 leading-none mb-2">{gameState?.scores[0]}</div>
+              {gameState?.status === 'aiming' && gameState.currentPlayer === 1 && (
+                <div className={`text-2xl font-black mb-2 animate-pulse ${gameState.turnTimeLeft <= 3 ? 'text-red-500' : 'text-white'}`}>
+                  {gameState.turnTimeLeft}
+                </div>
+              )}
               {gameState && (
                 <div className={`text-[10px] px-1 font-bold ${gameState.player1Projectile !== 'normal' ? 'bg-yellow-400 text-black animate-pulse' : 'bg-white/20 text-white'}`}>
                   {gameState.player1Projectile === 'giant' ? '十倍大香蕉' : gameState.player1Projectile === 'acid' ? '硫酸瓶' : gameState.player1Projectile === 'beam' ? '導引光束' : gameState.player1Projectile === 'meteor' ? '火熱隕石' : '香蕉'}
@@ -2224,9 +2276,14 @@ export default function App() {
 
           {/* Player 2 Side */}
           <div className="flex items-start gap-2">
-            <div className="bg-black/80 p-2 border-2 border-white text-right pointer-events-auto">
+            <div className="bg-black/80 p-2 border-2 border-white text-right pointer-events-auto flex flex-col items-center">
               <div className="text-[10px] uppercase opacity-70 leading-none mb-1">{gameState?.playerNames[1] || '玩家 2'}</div>
               <div className="text-xl font-bold text-yellow-400 leading-none mb-2">{gameState?.scores[1]}</div>
+              {gameState?.status === 'aiming' && gameState.currentPlayer === 2 && (
+                <div className={`text-2xl font-black mb-2 animate-pulse ${gameState.turnTimeLeft <= 3 ? 'text-red-500' : 'text-white'}`}>
+                  {gameState.turnTimeLeft}
+                </div>
+              )}
               {gameState && (
                 <div className={`text-[10px] px-1 font-bold inline-block ${gameState.player2Projectile !== 'normal' ? 'bg-yellow-400 text-black animate-pulse' : 'bg-white/20 text-white'}`}>
                   {gameState.player2Projectile === 'giant' ? '十倍大香蕉' : gameState.player2Projectile === 'acid' ? '硫酸瓶' : gameState.player2Projectile === 'beam' ? '導引光束' : gameState.player2Projectile === 'meteor' ? '火熱隕石' : '香蕉'}
@@ -2358,7 +2415,7 @@ export default function App() {
 
               <div className="absolute bottom-4 right-4 text-xs opacity-50 text-right">
                 <div>ＡＮＴＹＥＨ修正</div>
-                <div className="text-[10px] mt-1">v1.2.8</div>
+                <div className="text-[10px] mt-1">v1.2.9</div>
               </div>
             </motion.div>
           )}
