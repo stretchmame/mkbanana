@@ -1,0 +1,31 @@
+{
+  "entities": {
+    "LeaderboardEntry": {
+      "title": "Leaderboard Entry",
+      "description": "A high score entry on the hero board.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The player's display name (e.g., Grade-Class-Number)."
+        },
+        "score": {
+          "type": "integer",
+          "description": "The high score achieved."
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the score was achieved."
+        }
+      },
+      "required": ["name", "score", "timestamp"]
+    }
+  },
+  "firestore": {
+    "leaderboard": {
+      "schema": "LeaderboardEntry",
+      "description": "Collection of high scores."
+    }
+  }
+}

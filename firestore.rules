@@ -1,0 +1,54 @@
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: leaderboard
+// Document ID: auto-generated
+// Fields:
+//   - name: string (required, 1-50 chars) - Player's identity (e.g., Grade-Class-Number)
+//   - score: number (required, positive integer) - The high score
+//   - timestamp: timestamp (required) - When the score was achieved
+//
+// ===============================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isValidLeaderboardEntry(data) {
+      return data.keys().hasAll(['name', 'score', 'timestamp']) &&
+             data.name is string && data.name.size() >= 1 && data.name.size() <= 50 &&
+             data.score is int && data.score >= 0 &&
+             data.timestamp is timestamp;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /leaderboard/{entryId} {
+      // Anyone can read the leaderboard (publicly visible)
+      allow read: if true;
+      
+      // Anyone can create an entry (even unauthenticated for this arcade-style game)
+      // but we validate the data strictly
+      allow create: if isValidLeaderboardEntry(request.resource.data);
+      
+      // No updates or deletes allowed for leaderboard entries to prevent tampering
+      allow update, delete: if false;
+    }
+    
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

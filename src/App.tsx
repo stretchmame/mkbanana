@@ -6,8 +6,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Building, GameState, Point, CANVAS_WIDTH, CANVAS_HEIGHT, MONKEY_SIZE, GRAVITY, Treasure, ProjectileType, Destruction, ParticleType, Particle, Meteor } from './types';
 import { motion, AnimatePresence } from 'motion/react';
-import { Trophy, Wind, RotateCcw, Play, Maximize, Minimize, Volume2, VolumeX } from 'lucide-react';
+import { Trophy, Wind, RotateCcw, Play, Maximize, Minimize, Volume2, VolumeX, Medal, User, Send } from 'lucide-react';
 import { soundService } from './services/soundService';
+import { getTopScores, saveHighScore, LeaderboardEntry } from './firebase';
 
 const COLORS = ['#AAAAAA', '#00AAAA', '#AA0000'];
 
@@ -145,8 +146,24 @@ export default function App() {
   const [isPseudoFullscreen, setIsPseudoFullscreen] = useState(false);
   const [isPortrait, setIsPortrait] = useState(window.innerHeight > window.innerWidth);
   const [isMuted, setIsMuted] = useState(soundService.isMuted());
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  
+  const DEFAULT_LEADERBOARD: LeaderboardEntry[] = Array(5).fill(null).map((_, i) => ({
+    id: `default-${i}`,
+    name: '301-27號',
+    score: 100,
+    timestamp: new Date()
+  }));
+
+  const [showScoreEntry, setShowScoreEntry] = useState(false);
+  const [pendingScore, setPendingScore] = useState<{ name: string, score: number } | null>(null);
+  const [gradeInput, setGradeInput] = useState('');
+  const [classInput, setClassInput] = useState('');
+  const [numberInput, setNumberInput] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const lastWindowToggle = useRef<number>(0);
   const nextGameStarter = useRef<1 | 2>(1);
+  const hasCheckedHighScore = useRef(false);
 
   const calculateScore = (hitPos: Point, shooterPos: Point, targetPos: Point) => {
     const distBetween = Math.sqrt((shooterPos.x - targetPos.x) ** 2 + (shooterPos.y - targetPos.y) ** 2);
@@ -343,6 +360,25 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    const unsubscribe = getTopScores((scores) => {
+      setLeaderboard(scores);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (gameState?.status === 'tournamentOver' && !hasCheckedHighScore.current) {
+      const winnerIdx = gameState.tournamentWinner === 1 ? 0 : 1;
+      const winnerScore = gameState.roundHistory[winnerIdx === 0 ? 'p1' : 'p2'].reduce((a, b) => a + b, 0);
+      const winnerName = gameState.playerNames[winnerIdx];
+      checkHighScore(winnerIdx, winnerScore, winnerName);
+      hasCheckedHighScore.current = true;
+    } else if (gameState?.status !== 'tournamentOver') {
+      hasCheckedHighScore.current = false;
+    }
+  }, [gameState?.status, gameState?.tournamentWinner, gameState?.roundHistory, gameState?.playerNames]);
+
+  useEffect(() => {
     // Stop BGM on unmount
     return () => {
       soundService.stopBGM();
@@ -492,6 +528,35 @@ export default function App() {
   const handleResetToStart = () => {
     setGameState(null);
     setShowStartScreen(true);
+    setShowScoreEntry(false);
+    setPendingScore(null);
+  };
+
+  const checkHighScore = (winnerIdx: number, score: number, name: string) => {
+    const isTop5 = leaderboard.length < 5 || score > leaderboard[leaderboard.length - 1].score;
+    if (isTop5 && score > 0) {
+      setPendingScore({ name, score });
+      setShowScoreEntry(true);
+    }
+  };
+
+  const submitHighScore = async () => {
+    if (!gradeInput || !classInput || !numberInput || !pendingScore) return;
+    
+    setIsSubmitting(true);
+    try {
+      const fullName = `${gradeInput}年${classInput}班${numberInput}號`;
+      await saveHighScore(fullName, pendingScore.score);
+      setShowScoreEntry(false);
+      setPendingScore(null);
+      setGradeInput('');
+      setClassInput('');
+      setNumberInput('');
+    } catch (err) {
+      console.error("Failed to submit score:", err);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   useEffect(() => {
@@ -863,7 +928,7 @@ export default function App() {
             newPoints[prev.currentPlayer - 1] += 100;
 
             // Generate Particles
-            const particleCount = prev.banana.type === 'giant' ? 150 : (prev.banana.type === 'acid' ? 100 : 60);
+            const particleCount = prev.banana?.type === 'giant' ? 150 : (prev.banana?.type === 'acid' ? 100 : 60);
             const newParticles: Particle[] = Array.from({ length: particleCount }).flatMap((_, i) => {
               const base = {
                 id: Math.random(),
@@ -871,7 +936,7 @@ export default function App() {
                 vel: { x: (Math.random() - 0.5) * 20, y: (Math.random() - 0.5) * 20 },
                 life: 50 + Math.random() * 40,
                 maxLife: 90,
-                color: prev.banana.type === 'acid' ? '#00FF00' : '#FFCC99',
+                color: prev.banana?.type === 'acid' ? '#00FF00' : '#FFCC99',
                 size: 2 + Math.random() * 6,
                 type: 'normal' as ParticleType
               };
@@ -928,10 +993,10 @@ export default function App() {
               
               if (!inHole) {
                 // Generate Particles
-                const particleCount = prev.banana.type === 'giant' ? 120 : (prev.banana.type === 'acid' ? 100 : 40);
+                const particleCount = prev.banana?.type === 'giant' ? 120 : (prev.banana?.type === 'acid' ? 100 : 40);
                 const newParticles: Particle[] = Array.from({ length: particleCount }).flatMap((_, i) => {
-                  const isAcid = prev.banana.type === 'acid';
-                  const isGiant = prev.banana.type === 'giant';
+                  const isAcid = prev.banana?.type === 'acid';
+                  const isGiant = prev.banana?.type === 'giant';
                   
                   const base = {
                     id: Math.random(),
@@ -2415,7 +2480,7 @@ export default function App() {
 
               <div className="absolute bottom-4 right-4 text-xs opacity-50 text-right">
                 <div>ＡＮＴＹＥＨ修正</div>
-                <div className="text-[10px] mt-1">v1.2.9</div>
+                <div className="text-[10px] mt-1">v1.3.0</div>
               </div>
             </motion.div>
           )}
@@ -2485,77 +2550,183 @@ export default function App() {
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="absolute inset-0 flex flex-col items-center justify-center bg-[#0000AA] z-[60]"
+              className="absolute inset-0 flex flex-col items-center justify-center bg-[#0000AA] z-[60] overflow-y-auto py-12"
             >
-              <div className="relative flex flex-col items-center">
-                {/* Gorilla on top of Trophy */}
-                <div className="mb-[-10px] z-10">
-                   <BeatingGorilla color="#FFCC99" />
-                </div>
-                
-                {/* Trophy */}
-                <div className="relative">
-                  <Trophy size={160} className="text-yellow-400 drop-shadow-2xl" />
+              <div className="relative flex flex-col lg:flex-row items-center lg:items-start gap-12 max-w-6xl w-full px-8">
+                {/* Left Side: Winner Info */}
+                <div className="flex flex-col items-center flex-1">
+                  {/* Gorilla on top of Trophy */}
+                  <div className="mb-[-10px] z-10">
+                     <BeatingGorilla color="#FFCC99" />
+                  </div>
+                  
+                  {/* Trophy */}
+                  <div className="relative">
+                    <Trophy size={160} className="text-yellow-400 drop-shadow-2xl" />
+                  </div>
+
+                  <motion.h2 
+                    initial={{ y: 20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: 0.5 }}
+                    className="text-4xl md:text-6xl font-bold text-white mt-8 mb-4 drop-shadow-lg text-center"
+                  >
+                    恭喜贏家
+                  </motion.h2>
+                  
+                  <motion.p 
+                    initial={{ scale: 0.5, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ delay: 0.8 }}
+                    className="text-2xl md:text-3xl text-yellow-400 font-bold mb-8 text-center"
+                  >
+                    {gameState.tournamentWinner === 1 ? gameState.playerNames[0] : gameState.playerNames[1]} 統治了城市！
+                  </motion.p>
+
+                  {/* Round History Table */}
+                  <motion.div
+                    initial={{ y: 20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: 1 }}
+                    className="bg-black/40 border-2 border-white/30 p-4 mb-8 w-full max-w-md"
+                  >
+                    <h3 className="text-sm uppercase opacity-70 mb-4 text-center">每回合得分比較</h3>
+                    <div className="grid grid-cols-3 gap-4 text-center border-b border-white/20 pb-2 mb-2">
+                      <div className="text-[10px] uppercase opacity-50">回合</div>
+                      <div className="text-xs font-bold truncate">{gameState.playerNames[0]}</div>
+                      <div className="text-xs font-bold truncate">{gameState.playerNames[1]}</div>
+                    </div>
+                    <div className="max-h-40 overflow-y-auto custom-scrollbar">
+                      {gameState.roundHistory.p1.map((p1Score, idx) => (
+                        <div key={idx} className="grid grid-cols-3 gap-4 text-center py-1 border-b border-white/5 last:border-0">
+                          <div className="text-xs opacity-50">{idx + 1}</div>
+                          <div className={`text-sm ${p1Score > gameState.roundHistory.p2[idx] ? 'text-yellow-400 font-bold' : 'text-white'}`}>
+                            {p1Score}
+                          </div>
+                          <div className={`text-sm ${gameState.roundHistory.p2[idx] > p1Score ? 'text-yellow-400 font-bold' : 'text-white'}`}>
+                            {gameState.roundHistory.p2[idx]}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="grid grid-cols-3 gap-4 text-center pt-2 mt-2 border-t border-white/20 font-bold">
+                      <div className="text-xs uppercase opacity-50">總計</div>
+                      <div className="text-yellow-400">{gameState.roundHistory.p1.reduce((a, b) => a + b, 0)}</div>
+                      <div className="text-yellow-400">{gameState.roundHistory.p2.reduce((a, b) => a + b, 0)}</div>
+                    </div>
+                  </motion.div>
+
+                  <button
+                    onClick={handleResetToStart}
+                    className="retro-button text-xl md:text-2xl px-8 md:px-12 py-4 md:py-6"
+                  >
+                    重新開始新賽局
+                  </button>
                 </div>
 
-                <motion.h2 
-                  initial={{ y: 20, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  transition={{ delay: 0.5 }}
-                  className="text-6xl font-bold text-white mt-8 mb-4 drop-shadow-lg"
+                {/* Right Side: Hero Board (Leaderboard) */}
+                <motion.div 
+                  initial={{ x: 50, opacity: 0 }}
+                  animate={{ x: 0, opacity: 1 }}
+                  transition={{ delay: 1.2 }}
+                  className="flex-1 w-full max-w-md bg-black/50 border-4 border-yellow-400 p-6 shadow-[0_0_20px_rgba(250,204,21,0.3)]"
                 >
-                  恭喜贏家
-                </motion.h2>
-                
-                <motion.p 
-                  initial={{ scale: 0.5, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ delay: 0.8 }}
-                  className="text-3xl text-yellow-400 font-bold mb-8"
-                >
-                  {gameState.tournamentWinner === 1 ? gameState.playerNames[0] : gameState.playerNames[1]} 統治了城市！
-                </motion.p>
+                  <div className="flex items-center justify-center gap-3 mb-6">
+                    <Medal className="text-yellow-400" size={32} />
+                    <h3 className="text-3xl font-black text-white italic tracking-tighter">英雄榜</h3>
+                  </div>
 
-                {/* Round History Table */}
-                <motion.div
-                  initial={{ y: 20, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  transition={{ delay: 1 }}
-                  className="bg-black/40 border-2 border-white/30 p-4 mb-12 w-full max-w-md"
-                >
-                  <h3 className="text-sm uppercase opacity-70 mb-4 text-center">每回合得分比較</h3>
-                  <div className="grid grid-cols-3 gap-4 text-center border-b border-white/20 pb-2 mb-2">
-                    <div className="text-[10px] uppercase opacity-50">回合</div>
-                    <div className="text-xs font-bold truncate">{gameState.playerNames[0]}</div>
-                    <div className="text-xs font-bold truncate">{gameState.playerNames[1]}</div>
-                  </div>
-                  <div className="max-h-40 overflow-y-auto custom-scrollbar">
-                    {gameState.roundHistory.p1.map((p1Score, idx) => (
-                      <div key={idx} className="grid grid-cols-3 gap-4 text-center py-1 border-b border-white/5 last:border-0">
-                        <div className="text-xs opacity-50">{idx + 1}</div>
-                        <div className={`text-sm ${p1Score > gameState.roundHistory.p2[idx] ? 'text-yellow-400 font-bold' : 'text-white'}`}>
-                          {p1Score}
+                  <div className="space-y-3">
+                    {(() => {
+                      const displayBoard = leaderboard.length > 0 ? leaderboard : DEFAULT_LEADERBOARD;
+                      return displayBoard.map((entry, idx) => (
+                        <div 
+                          key={entry.id} 
+                          className={`flex items-center justify-between p-3 border-2 ${idx === 0 ? 'bg-yellow-400/20 border-yellow-400' : 'bg-white/5 border-white/20'}`}
+                        >
+                          <div className="flex items-center gap-4">
+                            <span className={`text-xl font-black w-6 ${idx === 0 ? 'text-yellow-400' : 'text-white/50'}`}>{idx + 1}</span>
+                            <span className="text-lg font-bold text-white truncate max-w-[180px]">{entry.name}</span>
+                          </div>
+                          <span className="text-2xl font-black text-yellow-400 font-mono">{entry.score}</span>
                         </div>
-                        <div className={`text-sm ${gameState.roundHistory.p2[idx] > p1Score ? 'text-yellow-400 font-bold' : 'text-white'}`}>
-                          {gameState.roundHistory.p2[idx]}
-                        </div>
-                      </div>
-                    ))}
+                      ));
+                    })()}
                   </div>
-                  <div className="grid grid-cols-3 gap-4 text-center pt-2 mt-2 border-t border-white/20 font-bold">
-                    <div className="text-xs uppercase opacity-50">總計</div>
-                    <div className="text-yellow-400">{gameState.roundHistory.p1.reduce((a, b) => a + b, 0)}</div>
-                    <div className="text-yellow-400">{gameState.roundHistory.p2.reduce((a, b) => a + b, 0)}</div>
+
+                  <div className="mt-8 pt-6 border-t border-white/20 text-center">
+                    <p className="text-[10px] uppercase tracking-widest opacity-50">只有最強的猩猩才能名留青史</p>
                   </div>
                 </motion.div>
-
-                <button
-                  onClick={handleResetToStart}
-                  className="retro-button text-2xl px-12 py-6"
-                >
-                  重新開始新賽局
-                </button>
               </div>
+
+              {/* High Score Entry Modal */}
+              <AnimatePresence>
+                {showScoreEntry && (
+                  <motion.div 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4"
+                  >
+                    <motion.div 
+                      initial={{ scale: 0.9, y: 20 }}
+                      animate={{ scale: 1, y: 0 }}
+                      className="bg-[#0000AA] border-8 border-white p-8 max-w-md w-full shadow-2xl text-center"
+                    >
+                      <Medal size={48} className="text-yellow-400 mx-auto mb-4 animate-bounce" />
+                      <h2 className="text-3xl font-bold mb-2">榮登英雄榜！</h2>
+                      <p className="text-lg mb-6">恭喜獲得 <span className="text-yellow-400 font-bold">{pendingScore?.score}</span> 分</p>
+                      
+                      <div className="space-y-4 mb-8">
+                        <p className="text-sm opacity-70">請輸入您的個人資料：</p>
+                        <div className="flex gap-2 justify-center items-center">
+                          <div className="flex flex-col gap-1">
+                            <input 
+                              type="number" 
+                              placeholder="年級" 
+                              value={gradeInput}
+                              onChange={(e) => setGradeInput(e.target.value)}
+                              className="retro-input w-20 text-center text-xl"
+                            />
+                            <span className="text-[10px] opacity-50">年級</span>
+                          </div>
+                          <span className="text-xl font-bold">-</span>
+                          <div className="flex flex-col gap-1">
+                            <input 
+                              type="number" 
+                              placeholder="班級" 
+                              value={classInput}
+                              onChange={(e) => setClassInput(e.target.value)}
+                              className="retro-input w-20 text-center text-xl"
+                            />
+                            <span className="text-[10px] opacity-50">班級</span>
+                          </div>
+                          <span className="text-xl font-bold">-</span>
+                          <div className="flex flex-col gap-1">
+                            <input 
+                              type="number" 
+                              placeholder="座號" 
+                              value={numberInput}
+                              onChange={(e) => setNumberInput(e.target.value)}
+                              className="retro-input w-20 text-center text-xl"
+                            />
+                            <span className="text-[10px] opacity-50">座號</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={submitHighScore}
+                        disabled={!gradeInput || !classInput || !numberInput || isSubmitting}
+                        className="retro-button w-full flex items-center justify-center gap-2 py-4 disabled:opacity-50"
+                      >
+                        {isSubmitting ? '傳送中...' : <><Send size={20} /> 登錄英雄榜</>}
+                      </button>
+                    </motion.div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </motion.div>
           )}
         </AnimatePresence>
