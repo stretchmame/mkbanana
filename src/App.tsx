@@ -443,6 +443,43 @@ export default function App() {
     const p1B = buildings[p1BuildingIdx];
     const p2B = buildings[p2BuildingIdx];
 
+    // Ensure there's at least one building between them that is taller than both players
+    const minMiddleIdx = p1BuildingIdx + 1;
+    const maxMiddleIdx = p2BuildingIdx - 1;
+    
+    if (minMiddleIdx <= maxMiddleIdx) {
+      const maxHeight = Math.max(p1B.height, p2B.height) + 40; // Add some buffer for monkey height
+      const middleIndices = [];
+      for (let i = minMiddleIdx; i <= maxMiddleIdx; i++) middleIndices.push(i);
+      
+      const hasTallBuilding = middleIndices.some(idx => buildings[idx].height > maxHeight);
+      
+      if (!hasTallBuilding) {
+        // Pick a random building in the middle and make it tall
+        const targetIdx = middleIndices[Math.floor(Math.random() * middleIndices.length)];
+        const newHeight = maxHeight + 20 + Math.random() * 100;
+        const b = buildings[targetIdx];
+        
+        // Update building properties
+        const rows = Math.floor(newHeight / 15);
+        const cols = Math.floor(b.width / 10);
+        const windows: boolean[][] = [];
+        for (let r = 0; r < rows; r++) {
+          windows[r] = [];
+          for (let c = 0; c < cols; c++) {
+            windows[r][c] = Math.random() > 0.3;
+          }
+        }
+        
+        buildings[targetIdx] = {
+          ...b,
+          height: newHeight,
+          y: CANVAS_HEIGHT - newHeight,
+          windows
+        };
+      }
+    }
+
     // Position so feet are on top (feet bottom is pos.y + 8.75)
     const p1Pos = { x: p1B.x + p1B.width / 2, y: p1B.y - 8.75 };
     const p2Pos = { x: p2B.x + p2B.width / 2, y: p2B.y - 8.75 };
